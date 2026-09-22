@@ -42,7 +42,7 @@ def get_cart(request):
 @permission_classes([IsAuthenticated])
 def add_to_cart(request):
     product_id = request.data.get('product_id')
-    if not product_id:   #will remove this
+    if not product_id:  
         return Response({'message':'Product ID is required'}, status=400) 
     try:
         product = Product.objects.get(id=product_id)
@@ -101,12 +101,14 @@ def create_order(request):
     try:
         data = request.data
         name = data.get('name')
-        save_address = data.get('save_address')
         new_address = data.get('new_address')
         phone = data.get('phone')
         payment_method = data.get('payment_method')
-
-        if not phone.isdigit() or len(phone) < 10:
+        if not phone or not new_address:
+            return Response({"message":'Without phone or address you cant order'}, status=400)
+        shipping_address = new_address
+        
+        if not phone.isdigit() or len(phone) != 10:
             return Response({"message":'Invalid phone number'}, status=400)
 
         profile, _ = UserProfile.objects.get_or_create(user=request.user)
@@ -114,13 +116,6 @@ def create_order(request):
         request.user.save()
         profile.phone = phone
         profile.save()
-        if save_address:
-            shipping_address = save_address
-        else:
-            if not new_address:
-                return Response({'error':'New Adress is required'}, status=404)
-            shipping_address = new_address
-        
         cart = Cart.objects.get(user=request.user)
         if not cart.items.exists():
             return Response({'error':'No items found to order'}, status=400)

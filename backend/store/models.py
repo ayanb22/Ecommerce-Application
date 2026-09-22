@@ -56,7 +56,7 @@ class Order(models.Model):
     status_choices = [('pending', 'Pending'),('cancelled', 'Cancelled')]
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     payment_method = models.CharField(max_length=50, default='COD')
-    shipping_address = models.TextField(default='save_address')
+    shipping_address = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=status_choices, default='pending')
 
