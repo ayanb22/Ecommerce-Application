@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'store.middleware.RequestMetricsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -166,4 +167,28 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS' : False,
     'BLACKLIST_AFTER_ROTATION' : True,
     'AUTH_HEADER_TYPES' : ('Bearer',)
+}
+
+
+LOGGING = {
+    'version' : 1,
+    'disable_existing_loggers' : False,
+    'formatters':{
+        'request_format':{
+            'format':'{message} | request_id={request_id} | method={method} | path={path} | status={status} | elapsed_ms={time_elapsed_ms}',
+            'style': '{',
+        },
+    },
+    'handlers':{
+        'console':{
+            'class':'logging.StreamHandler',
+            'formatter':'request_format',
+        },
+    },
+    'loggers' :{
+        'request_metrics': {
+            'handlers':['console'],
+            'level': 'INFO'
+        },
+    },
 }
