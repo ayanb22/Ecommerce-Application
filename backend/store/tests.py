@@ -1,4 +1,7 @@
 from django.test import TestCase
+from rest_framework.test import APITestCase
+from django.contrib.auth.models import User, Permission
+from rest_framework import status
 
 class RequestMetricsMiddlewareTest(TestCase):
     def test_response_request_header(self):
@@ -20,3 +23,7 @@ class RequestMetricsMiddlewareTest(TestCase):
         invalid_id = 'my test request 123'
         response = self.client.get('/api/cart/', HTTP_X_REQUEST_ID=invalid_id)
         self.assertNotEqual(response['X-Request-ID'], invalid_id)
+
+# class ProductManagementTest(APITestCase):
+#     def setup(self):
+

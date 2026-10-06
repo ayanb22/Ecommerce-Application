@@ -105,3 +105,21 @@ class CartItem(models.Model):
     def subtotal(self):
         return self.quantity * self.product.dynamic_price
 
+class Review(models.Model):
+    rating_choices = [(1, '1 Star'), (2, '2 Stars'), (3, '3 Stars'), (4, '4 Stars'), (5, '5 Stars')]
+    product = models.ForeignKey(Product, related_name='reviews', on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    review = models.TextField()
+    rating = models.IntegerField(choices=rating_choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['product', 'user'],
+                name='unique_product_user_review'
+            )
+        ]
+

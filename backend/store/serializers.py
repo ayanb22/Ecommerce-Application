@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, Category, CartItem, Cart, UserProfile, OrderItem, Order
+from .models import Product, Category, CartItem, Cart, UserProfile, OrderItem, Order, Review
 from django.contrib.auth.models import User
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -11,9 +11,11 @@ class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     stock_message = serializers.CharField(read_only=True)
     dynamic_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    review_count = serializers.IntegerField(read_only=True)
+    average_rating = serializers.FloatField(read_only=True)
     class Meta:
         model = Product
-        fields = ['id', 'category', 'name', 'description', 'image', 'dynamic_price', 'stock_message']
+        fields = ['id', 'category', 'name', 'description', 'image', 'dynamic_price', 'stock_message', 'review_count', 'average_rating']
 
 class CartItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
@@ -73,7 +75,14 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = '__all__' 
         
-class UserProfileSerialiser(serializers.ModelSerializer):
+class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ['phone', 'save_address']
+
+class ReviewSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    product =  serializers.PrimaryKeyRelatedField(read_only=True)
+    class Meta:
+        model = Review
+        fields = ['id', 'product', 'user', 'title', 'review',  'rating', 'created_at', 'updated_at']

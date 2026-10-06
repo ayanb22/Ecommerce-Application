@@ -1,28 +1,33 @@
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.models import User
-from .models import Product, Category, Cart, CartItem, Order, OrderItem, UserProfile
-from .serializers import ProductSerializer, CategorySerializer, CartSerializer, CartItemSerializer, RegistrationSerializer, UserSerializer, OrderItemSerializer, OrderSerializer
+from .models import Product, Category, Cart, CartItem, Order, OrderItem, UserProfile, Review
+from .serializers import ProductSerializer, CategorySerializer, CartSerializer, CartItemSerializer, RegistrationSerializer, UserSerializer, OrderItemSerializer, OrderSerializer, ReviewSerializer
+from rest_framework.pagination import PageNumberPagination
+from .decorators import require_django_permission
+from django.utils.decorators import method_decorator
+from django.db.models import Count, Avg
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def product_list(request):
-    product = Product.objects.all()
-    serializer = ProductSerializer(product, many=True, context={'request':request})
-    return Response(serializer.data)
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def product_details(request, pk):
-    try:
-        product = Product.objects.get(pk=pk)
-        serializer = ProductSerializer(product, context={'request':request})
+class ProductListView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        product = Product.objects.all()
+        serializer = ProductSerializer(product, many=True, context={'request':request})
         return Response(serializer.data)
-    except Product.DoesNotExist:
-        return Response({'error':"Product Not Found"},status=status.HTTP_404_NOT_FOUND)
-    
+
+class ProductDetailView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request, pk):
+        try:
+            product = Product.objects.annotate(review_count=Count("reviews"), average_rating=Avg("reviews__rating")).get(pk=pk)
+            serializer = ProductSerializer(product, context={'request':request})
+            return Response(serializer.data)
+        except Product.DoesNotExist:
+            return Response({'error':"Product Not Found"},status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -179,4 +184,90 @@ def register_view(request):
     return Response(serializer.errors, status=400)
 
 
+class ProductManagementView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    @method_decorator(require_django_permission('store.change_product'))
+    def patch(self, request, pk):
+        try:
+            product = Product.objects.get(pk=pk)
+        except Product.DoesNotExist:
+            return Response({"message": "Product does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ProductSerializer(product, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class ReviewPagination(PageNumberPagination):
+    page_size = 5
+
+class ReviewListCreateView(APIView):
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return[IsAuthenticated()]
+        return[AllowAny()]
+
+    def get(self, request, pk):
+        try:
+            product = Product.objects.get(pk=pk)
+        except Product.DoesNotExist:
+            return Response({"message": "Product does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+        reviews = Review.objects.filter(product=product).order_by('-created_at', '-id')
+        paginator = ReviewPagination()
+        page = paginator.paginate_queryset(reviews, request)
+        serializer = ReviewSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    def post(self, request, pk):
+        try:
+            product = Product.objects.get(pk=pk)
+        except Product.DoesNotExist:
+            return Response({"message": "Product does not exist"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ReviewSerializer(data=request.data)
+        if serializer.is_valid():
+            if Review.objects.filter(product=product, user=request.user).exists():
+                return Response({"message": "Product review already exist"}, status=status.HTTP_400_BAD_REQUEST)
+            serializer.save(product=product, user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ReviewRetrieveEditDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            review = Review.objects.get(pk=pk)
+        except Review.DoesNotExist:
+            return Response({"message": "Review does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ReviewSerializer(review)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk):
+        try:
+            review = Review.objects.get(pk=pk)
+        except Review.DoesNotExist:
+            return Response({"message": "Review does not exist"}, status=status.HTTP_404_NOT_FOUND)
+        if review.user != request.user:
+            return Response({"message": "You can only edit your review"}, status=status.HTTP_403_FORBIDDEN)
+        serializer = ReviewSerializer(review, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        try: 
+            review = Review.objects.get(pk=pk)
+        except Review.DoesNotExist:
+            return Response({"message": "Review does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+        if review.user != request.user:
+            return Response({"message": "You can only delete your review"}, status=status.HTTP_403_FORBIDDEN)
+        review.delete()
+        return Response({'message':'Your Review is deleted successfully'}, status=status.HTTP_200_OK)
