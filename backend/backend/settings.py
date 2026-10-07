@@ -192,3 +192,20 @@ LOGGING = {
         },
     },
 }
+
+CELERY_BROKER_URL = 'filesystem://'
+
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'data_folder_in' : str(BASE_DIR / 'celery_queue'),
+    'data_folder_out' : str(BASE_DIR / 'celery_queue'),
+    'processed_folder' : str(BASE_DIR / 'celery_processed'),
+    'control_folder' : str(BASE_DIR / 'celery_control'),
+    'store_processed' : True
+}
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Kolkata'
+CELERY_TASK_IGNORE_RESULT = True
+
+LOW_STOCK_THRESHOLD = 5
