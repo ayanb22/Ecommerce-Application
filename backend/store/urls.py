@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import ReviewListCreateView, ReviewRetrieveEditDeleteView, ProductManagementView, ProductListView, ProductDetailView
+from .views import ReviewListCreateView, ReviewRetrieveEditDeleteView, ProductManagementView, ProductListView, ProductDetailView, ProductVarientDetailView, ProductVarientListCreateView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 
@@ -8,6 +8,8 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('product/', ProductListView.as_view(), name='product_list'),
     path('product/<int:pk>/', ProductDetailView.as_view(), name='product_details'),
+    path('product/<int:pk>/varient/', ProductVarientListCreateView.as_view(), name='varient_list_create'),
+    path('varient/<int:pk>/', ProductVarientDetailView.as_view(), name='varient_detail'),
     path('category/', views.category_list, name='category'),
     path('cart/', views.get_cart, name='cart'),
     path('cart/add/', views.add_to_cart, name='add'),

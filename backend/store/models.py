@@ -124,3 +124,25 @@ class Review(models.Model):
             )
         ]
 
+
+class ProductVarient(models.Model):
+    product = models.ForeignKey(Product, related_name='varients', on_delete=models.CASCADE)
+    sku = models.CharField(max_length=200, unique=True)
+    attributes = models.JSONField(default=dict)
+    combination_key = models.CharField(max_length=500)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    stock = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sku', 'product'],
+                name = 'unique_product_varient_combination'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.product} - {self.sku}"

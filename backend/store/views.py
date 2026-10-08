@@ -4,12 +4,14 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.models import User
-from .models import Product, Category, Cart, CartItem, Order, OrderItem, UserProfile, Review
-from .serializers import ProductSerializer, CategorySerializer, CartSerializer, CartItemSerializer, RegistrationSerializer, UserSerializer, OrderItemSerializer, OrderSerializer, ReviewSerializer
+from .models import Product, Category, Cart, CartItem, Order, OrderItem, UserProfile, Review, ProductVarient
+from .serializers import ProductSerializer, CategorySerializer, CartSerializer, CartItemSerializer, RegistrationSerializer, UserSerializer, OrderItemSerializer, OrderSerializer, ReviewSerializer, ProductVarientSerializer
 from rest_framework.pagination import PageNumberPagination
 from .decorators import require_django_permission
 from django.utils.decorators import method_decorator
 from django.db.models import Count, Avg
+from rest_framework import generics
+from .permissions import ProductVarientWritePermission
 
 
 class ProductListView(APIView):
@@ -202,7 +204,7 @@ class ProductManagementView(APIView):
 
 
 
-class ReviewPagination(PageNumberPagination):
+class StanderdPagination(PageNumberPagination):
     page_size = 5
 
 class ReviewListCreateView(APIView):
@@ -218,7 +220,7 @@ class ReviewListCreateView(APIView):
             return Response({"message": "Product does not exist"}, status=status.HTTP_404_NOT_FOUND)
 
         reviews = Review.objects.filter(product=product).order_by('-created_at', '-id')
-        paginator = ReviewPagination()
+        paginator = StanderdPagination()
         page = paginator.paginate_queryset(reviews, request)
         serializer = ReviewSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
@@ -271,3 +273,36 @@ class ReviewRetrieveEditDeleteView(APIView):
             return Response({"message": "You can only delete your review"}, status=status.HTTP_403_FORBIDDEN)
         review.delete()
         return Response({'message':'Your Review is deleted successfully'}, status=status.HTTP_200_OK)
+
+
+class ProductVarientListCreateView(generics.ListCreateAPIView):
+    queryset = ProductVarient.objects.all()
+    serializer_class = ProductVarientSerializer
+    pagination_class = StanderdPagination
+    permission_classes = [ProductVarientWritePermission]
+
+    def get_queryset(self):
+        queryset = ProductVarient.objects.select_related('product').filter(product_id=self.kwargs['product_id']).order_by('-created_at', '-id')
+        sku = self.request.query_params.get('sku')
+        available = self.query_params.get('available')
+
+        if sku:
+            queryset=queryset.filter(sku__iexact=sku)
+        if available == 'true':
+            queryset = queryset.filter(stock__gt=True, active=True)
+        return queryset
+    
+    def perform_create(self, serializer):
+        product_id = self.kwargs['product_id']
+        try:
+            product = Product.objects.get(pk=product_id)
+        except Product.DoesNotExist:
+            from rest_framework.exceptions import NotFound
+            raise NotFound("Product does not exist.")
+
+        serializer.save(product=product)
+
+class ProductVarientDetailView(generics.RetrieveUpdateAPIView):
+    queryset = ProductVarient.objects.select_related('product')
+    serializer_class = ProductVarientSerializer
+    permission_classes = [ProductVarientWritePermission]

@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import Product, Category, CartItem, Cart, UserProfile, OrderItem, Order, Review
+from .models import Product, Category, CartItem, Cart, UserProfile, OrderItem, Order, Review, ProductVarient
 from django.contrib.auth.models import User
+import json
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -86,3 +87,47 @@ class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = ['id', 'product', 'user', 'title', 'review',  'rating', 'created_at', 'updated_at']
+
+class ProductVarientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductVarient
+        fields = ['id', 'product', 'sku', 'attributes', 'combination_key', 'price', 'stock', 'active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'combination_key', 'created_at', 'updated_at']
+
+    def validate_attributes(self, value):
+        if not isinstance(value, dict) or not value:
+            raise serializers.ValidationError("Attributes must be non empty object")
+        allowed_attributes = {'size', 'color', 'storage'}
+
+        for attribute_name,  attribute_value in value.items():
+            if attribute_name not in allowed_attributes:
+                raise serializers.ValidationError(f"Unsupported attribute : {attribute_name}")
+            if not isinstance(attribute_value, str):
+                raise serializers.ValidationError(f"Value for {attribute_name} must be a string")
+            if not attribute_value.strip():
+                raise serializers.ValidationError(f"Value of {attribute_name} can not be empty")
+        return {
+            key.strip().lower():str(value).strip().lower()
+            for key, value in value.items()
+        }
+    def validate_sku(self, value):
+        value = value.strip().lower()
+
+        if not value:
+            raise serializers.ValidationError("Sku can not be empty")
+        return value
+
+    def validate(self, atr):
+        attributes = atr.get('attributes', getattr(self.instance, 'attributes', {}))
+        product = atr.get('product', getattr(self.instance, 'product', None))
+        sorted_attributes = dict(sorted(attributes.items()))
+        combination_key = json.dumps(sorted_attributes, separators=(',', ':'))
+        if ProductVarient.objects.filter(product=product, combination_key=combination_key).exclude(pk=self.instance.pk if self.instance else None).exists():
+            raise serializers.ValidationError(
+                {
+                    'attributes' : ("This attribute combination already exist for this product")
+                }
+            )
+        atr['attributes']=sorted_attributes
+        atr['combination_key'] = combination_key
+        return atr
