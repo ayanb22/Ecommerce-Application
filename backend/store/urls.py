@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import ReviewListCreateView, ReviewRetrieveEditDeleteView, ProductManagementView, ProductListView, ProductDetailView, ProductVarientDetailView, ProductVarientListCreateView
+from .views import ReviewListCreateView, ReviewRetrieveEditDeleteView, ProductManagementView, ProductListView, ProductDetailView, ProductVarientDetailView, ProductVarientListCreateView, HealthLiveView, HealthReadyView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 
@@ -22,6 +22,8 @@ urlpatterns = [
     path('products/<int:pk>/review/', ReviewListCreateView.as_view(), name='reviews'),
     path('review/<int:pk>/', ReviewRetrieveEditDeleteView.as_view(), name='review'),
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh')
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('health/live/', HealthLiveView.as_view(), name='health_live'),
+    path('health/ready/', HealthReadyView.as_view(), name='health_ready')
 
 ]

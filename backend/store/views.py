@@ -12,6 +12,8 @@ from django.utils.decorators import method_decorator
 from django.db.models import Count, Avg
 from rest_framework import generics
 from .permissions import ProductVarientWritePermission
+from django.db import connection
+
 
 
 class ProductListView(APIView):
@@ -306,3 +308,18 @@ class ProductVarientDetailView(generics.RetrieveUpdateAPIView):
     queryset = ProductVarient.objects.select_related('product')
     serializer_class = ProductVarientSerializer
     permission_classes = [ProductVarientWritePermission]
+
+
+
+class HealthLiveView(APIView):
+    def get(self, request):
+        return Response({'status':'ok'}, status=status.HTTP_200_OK)
+
+class HealthReadyView(APIView):
+    def get(self, request):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT 1')
+            return Response({'status':'ready'}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({'status':'not ready'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
