@@ -8,5 +8,7 @@ class ProductVarientWritePermission(BasePermission):
             return True
         if not request.user or not request.user.is_authenticated:
             return False
+        if request.method == 'POST':
+            return request.user.has_perm('store.add_productvarient')
 
         return request.user.has_perm('store.change_productvarient')

@@ -18,6 +18,11 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['id', 'category', 'name', 'description', 'image', 'dynamic_price', 'stock_message', 'review_count', 'average_rating']
 
+class ProductAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ['name', 'description', 'image', 'price', 'stock']
+
 class CartItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_price = serializers.DecimalField(source='product.dynamic_price', max_digits=10, decimal_places=2, read_only=True)
@@ -92,7 +97,7 @@ class ProductVarientSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVarient
         fields = ['id', 'product', 'sku', 'attributes', 'combination_key', 'price', 'stock', 'active', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'combination_key', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'product', 'combination_key', 'created_at', 'updated_at']
 
     def validate_attributes(self, value):
         if not isinstance(value, dict) or not value:
@@ -115,6 +120,11 @@ class ProductVarientSerializer(serializers.ModelSerializer):
 
         if not value:
             raise serializers.ValidationError("Sku can not be empty")
+        duplicates = ProductVarient.objects.filter(sku=value)
+        if self.instance:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise serializers.ValidationError("A variant with this SKU already exists.")
         return value
 
     def validate(self, atr):

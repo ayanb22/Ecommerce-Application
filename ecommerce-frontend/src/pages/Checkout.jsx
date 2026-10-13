@@ -37,8 +37,8 @@ export default function Checkout() {
 
     // Mirrors the backend's own phone check (views.create_order): digits
     // only, at least 10 characters — catch it here before the round trip.
-    if (!/^\d{10,}$/.test(form.phone)) {
-      setError('Enter a valid phone number (at least 10 digits, numbers only).');
+    if (!/^\d{10}$/.test(form.phone)) {
+      setError('Enter a valid phone number (exactly 10 digits, numbers only).');
       return;
     }
 

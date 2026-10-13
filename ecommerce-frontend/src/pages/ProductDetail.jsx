@@ -6,6 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { formatMoney } from '../utils/format';
 import { Spinner, ErrorBanner } from '../components/Feedback';
+import { StarRating } from '../components/StarRating';
+import Reviews from '../components/Reviews';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -19,16 +21,19 @@ export default function ProductDetail() {
   const [addState, setAddState] = useState('idle'); // idle | adding | added | error
   const [addError, setAddError] = useState(null);
 
-  async function load() {
-    setLoading(true);
-    setLoadError(null);
+  // `silent` refreshes the product (for the rating summary) without swapping the
+  // whole page for a spinner, and without replacing it with an error banner if
+  // the refresh fails.
+  async function load({ silent = false } = {}) {
+    if (!silent) setLoading(true);
+    if (!silent) setLoadError(null);
     try {
       const data = await fetchProduct(id);
       setProduct(data);
     } catch (err) {
-      setLoadError(extractErrorMessage(err, 'Could not load this product.'));
+      if (!silent) setLoadError(extractErrorMessage(err, 'Could not load this product.'));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -58,11 +63,14 @@ export default function ProductDetail() {
   if (loadError) {
     return (
       <div className="max-w-6xl mx-auto px-6 py-10">
-        <ErrorBanner message={loadError} onRetry={load} />
+        <ErrorBanner message={loadError} onRetry={() => load()} />
       </div>
     );
   }
   if (!product) return null;
+
+  const outOfStock = product.stock_message === 'Out of Stock';
+  const hasRating = product.review_count > 0 && typeof product.average_rating === 'number';
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
@@ -82,8 +90,19 @@ export default function ProductDetail() {
             <p className="text-ink/50 text-sm mb-2">{product.category.name}</p>
           )}
           <h1 className="text-3xl mb-3">{product.name}</h1>
-          <p className="text-xl font-medium mb-6">{formatMoney(product.dynamic_price)}</p>
-          <p className="text-sm text-ink/60 mb-6 -mt-4">{product.stock_message}</p>
+
+          {hasRating && (
+            <div className="flex items-center gap-2 mb-4 text-sm text-ink/60">
+              <StarRating value={product.average_rating} />
+              <span>
+                {product.average_rating.toFixed(1)} · {product.review_count}{' '}
+                {product.review_count === 1 ? 'review' : 'reviews'}
+              </span>
+            </div>
+          )}
+
+          <p className="text-xl font-medium mb-2">{formatMoney(product.dynamic_price)}</p>
+          <p className="text-sm text-ink/60 mb-6">{product.stock_message}</p>
 
           {product.description && (
             <p className="text-ink/70 leading-relaxed mb-8">{product.description}</p>
@@ -94,13 +113,15 @@ export default function ProductDetail() {
           <button
             type="button"
             onClick={handleAddToCart}
-            disabled={addState === 'adding' || product.stock_message === 'Out of Stock'}
+            disabled={addState === 'adding' || outOfStock}
             className="btn-primary w-full sm:w-auto"
           >
             {addState === 'adding' ? 'Adding…' : addState === 'added' ? 'Added to cart' : 'Add to cart'}
           </button>
         </div>
       </div>
+
+      <Reviews productId={product.id} onChanged={() => load({ silent: true })} />
     </div>
   );
 }

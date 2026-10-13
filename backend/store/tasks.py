@@ -7,7 +7,7 @@ def check_low_stock(product_id):
     try:
         product = Product.objects.get(pk=product_id)
     except Product.DoesNotExist:
-        return ({'status':'Skipped', 'message':'Product Does not exist'})
+        return ({'status':'Skipped', 'message':'Product does not exist'})
 
     threshold = settings.LOW_STOCK_THRESHOLD
     if product.stock <= threshold:

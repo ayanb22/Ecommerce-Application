@@ -5,21 +5,21 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.models import User
 from .models import Product, Category, Cart, CartItem, Order, OrderItem, UserProfile, Review, ProductVarient
-from .serializers import ProductSerializer, CategorySerializer, CartSerializer, CartItemSerializer, RegistrationSerializer, UserSerializer, OrderItemSerializer, OrderSerializer, ReviewSerializer, ProductVarientSerializer
+from .serializers import ProductSerializer, CategorySerializer, CartSerializer, CartItemSerializer, RegistrationSerializer, UserSerializer, OrderItemSerializer, OrderSerializer, ReviewSerializer, ProductVarientSerializer, ProductAdminSerializer
 from rest_framework.pagination import PageNumberPagination
 from .decorators import require_django_permission
 from django.utils.decorators import method_decorator
 from django.db.models import Count, Avg
 from rest_framework import generics
 from .permissions import ProductVarientWritePermission
-from django.db import connection
+from django.db import connection, IntegrityError
 
 
 
 class ProductListView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
-        product = Product.objects.all()
+        product = Product.objects.annotate(review_count=Count("reviews"), average_rating=Avg("reviews__rating")).order_by('id')
         serializer = ProductSerializer(product, many=True, context={'request':request})
         return Response(serializer.data)
 
@@ -198,7 +198,7 @@ class ProductManagementView(APIView):
         except Product.DoesNotExist:
             return Response({"message": "Product does not exist"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = ProductSerializer(product, data=request.data, partial=True)
+        serializer = ProductAdminSerializer(product, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -236,7 +236,10 @@ class ReviewListCreateView(APIView):
         if serializer.is_valid():
             if Review.objects.filter(product=product, user=request.user).exists():
                 return Response({"message": "Product review already exist"}, status=status.HTTP_400_BAD_REQUEST)
-            serializer.save(product=product, user=request.user)
+            try:
+                serializer.save(product=product, user=request.user)
+            except IntegrityError:
+                return Response({"message": "Product review already exist"}, status=status.HTTP_400_BAD_REQUEST)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -284,18 +287,22 @@ class ProductVarientListCreateView(generics.ListCreateAPIView):
     permission_classes = [ProductVarientWritePermission]
 
     def get_queryset(self):
-        queryset = ProductVarient.objects.select_related('product').filter(product_id=self.kwargs['product_id']).order_by('-created_at', '-id')
+        queryset = ProductVarient.objects.select_related('product').filter(product_id=self.kwargs['pk']).order_by('-created_at', '-id')
         sku = self.request.query_params.get('sku')
-        available = self.query_params.get('available')
+        available = self.request.query_params.get('available')
 
         if sku:
             queryset=queryset.filter(sku__iexact=sku)
         if available == 'true':
             queryset = queryset.filter(stock__gt=True, active=True)
         return queryset
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['product'] = Product.objects.filter(pk=self.kwargs.get('product_id')).first()
+        return context
     
     def perform_create(self, serializer):
-        product_id = self.kwargs['product_id']
+        product_id = self.kwargs['pk']
         try:
             product = Product.objects.get(pk=product_id)
         except Product.DoesNotExist:
@@ -312,6 +319,9 @@ class ProductVarientDetailView(generics.RetrieveUpdateAPIView):
 
 
 class HealthLiveView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    
     def get(self, request):
         return Response({'status':'ok'}, status=status.HTTP_200_OK)
 
